@@ -1,0 +1,6 @@
+__pycache__/
+.venv/
+debian/rhasspy-tts-cli-hermes*
+dist/
+*.egg-info/
+pyinstaller/
