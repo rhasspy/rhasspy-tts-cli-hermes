@@ -43,6 +43,7 @@ class TtsHermesMqtt:
             _LOGGER.debug(say_command)
 
             wav_bytes = subprocess.check_output(say_command)
+            assert wav_bytes
             _LOGGER.debug("Got %s byte(s) of WAV data", len(wav_bytes))
         except Exception:
             _LOGGER.exception("tts_command")
