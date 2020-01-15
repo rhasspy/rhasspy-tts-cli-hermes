@@ -1,6 +1,7 @@
 __pycache__/
 .mypy_cache/
 .venv/
+.vscode/
 debian/rhasspy-tts-cli-hermes*
 dist/
 *.egg-info/
