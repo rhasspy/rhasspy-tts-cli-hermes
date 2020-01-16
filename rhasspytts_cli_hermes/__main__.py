@@ -11,7 +11,7 @@ _LOGGER = logging.getLogger(__name__)
 
 def main():
     """Main method."""
-    parser = argparse.ArgumentParser(prog="rhasspytts_cli_hermes")
+    parser = argparse.ArgumentParser(prog="rhasspy-tts-cli-hermes")
     parser.add_argument(
         "--tts-command",
         required=True,
