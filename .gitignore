@@ -6,3 +6,4 @@ debian/rhasspy-tts-cli-hermes*
 dist/
 *.egg-info/
 pyinstaller/
+download/
