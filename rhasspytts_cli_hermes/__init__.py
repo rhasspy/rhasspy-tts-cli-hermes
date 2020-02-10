@@ -63,9 +63,8 @@ class TtsHermesMqtt:
             else:
                 # Publish playBytes
                 request_id = say.id or str(uuid4())
-                self.client.publish(
-                    AudioPlayBytes.topic(site_id=self.siteId, request_id=request_id),
-                    wav_bytes,
+                self.publish(
+                    AudioPlayBytes(wav_bytes), siteId=self.siteId, requestId=request_id
                 )
 
     # -------------------------------------------------------------------------
@@ -99,9 +98,18 @@ class TtsHermesMqtt:
     def publish(self, message: Message, **topic_args):
         """Publish a Hermes message to MQTT."""
         try:
-            _LOGGER.debug("-> %s", message)
+            if isinstance(message, AudioPlayBytes):
+                _LOGGER.debug(
+                    "-> %s(%s byte(s))",
+                    message.__class__.__name__,
+                    len(message.wav_bytes),
+                )
+                payload = message.wav_bytes
+            else:
+                _LOGGER.debug("-> %s", message)
+                payload = json.dumps(attr.asdict(message))
+
             topic = message.topic(**topic_args)
-            payload = json.dumps(attr.asdict(message))
             _LOGGER.debug("Publishing %s char(s) to %s", len(payload), topic)
             self.client.publish(topic, payload)
         except Exception:
