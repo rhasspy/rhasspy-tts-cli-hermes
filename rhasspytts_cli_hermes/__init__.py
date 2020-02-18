@@ -64,7 +64,9 @@ class TtsHermesMqtt:
                 # Publish playBytes
                 request_id = say.id or str(uuid4())
                 self.publish(
-                    AudioPlayBytes(wav_bytes), siteId=self.siteId, requestId=request_id
+                    AudioPlayBytes(wav_bytes=wav_bytes),
+                    siteId=self.siteId,
+                    requestId=request_id,
                 )
 
     # -------------------------------------------------------------------------
@@ -107,10 +109,10 @@ class TtsHermesMqtt:
                 payload = message.wav_bytes
             else:
                 _LOGGER.debug("-> %s", message)
-                payload = json.dumps(attr.asdict(message))
+                payload = json.dumps(attr.asdict(message)).encode()
 
             topic = message.topic(**topic_args)
-            _LOGGER.debug("Publishing %s char(s) to %s", len(payload), topic)
+            _LOGGER.debug("Publishing %s bytes(s) to %s", len(payload), topic)
             self.client.publish(topic, payload)
         except Exception:
             _LOGGER.exception("on_message")
