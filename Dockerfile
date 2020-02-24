@@ -1,12 +1,23 @@
-ARG BUILD_ARCH=amd64
-FROM ${BUILD_ARCH}/debian:buster-slim
+ARG BUILD_ARCH
+FROM ${BUILD_ARCH}/python:3.7-alpine
+ARG BUILD_ARCH
+ARG FRIENDLY_ARCH
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        espeak flite \
-        alsa-utils
+# Multi-arch
+COPY etc/qemu-arm-static /usr/bin/
+COPY etc/qemu-aarch64-static /usr/bin/
 
-COPY pyinstaller/dist/* /usr/lib/rhasspytts_cli_hermes/
-COPY debian/bin/* /usr/bin/
+COPY requirements.txt /
 
-ENTRYPOINT ["/usr/bin/rhasspy-tts-cli-hermes"]
+RUN grep '^rhasspy-' /requirements.txt | \
+    sed -e 's|=.\+|/archive/master.tar.gz|' | \
+    sed 's|^|https://github.com/rhasspy/|' \
+    > /requirements_rhasspy.txt
+
+RUN pip install --no-cache-dir -r /requirements_rhasspy.txt
+RUN pip install --no-cache-dir -r /requirements.txt
+
+COPY rhasspytts_cli_hermes/ /rhasspytts_cli_hermes/
+WORKDIR /
+
+ENTRYPOINT ["python3", "-m", "rhasspytts_cli_hermes"]

@@ -1,3 +1,6 @@
 *
 !pyinstaller/dist
 !debian/bin
+!requirements.txt
+!rhasspytts_cli_hermes/*.py
+!etc/
