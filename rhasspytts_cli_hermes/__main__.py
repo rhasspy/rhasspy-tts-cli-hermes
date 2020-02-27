@@ -19,8 +19,10 @@ def main():
     )
     parser.add_argument(
         "--play-command",
-        default=None,
         help="Command to play WAV data from stdin (default: publish playBytes)",
+    )
+    parser.add_argument(
+        "--voices-command", help="Command to list voices (one per line)"
     )
     parser.add_argument(
         "--host", default="localhost", help="MQTT host (default: localhost)"
@@ -47,7 +49,11 @@ def main():
         # Listen for messages
         client = mqtt.Client()
         hermes = TtsHermesMqtt(
-            client, args.tts_command, play_command=args.play_command, siteId=args.siteId
+            client,
+            args.tts_command,
+            play_command=args.play_command,
+            voices_command=args.voices_command,
+            siteId=args.siteId,
         )
 
         def on_disconnect(client, userdata, flags, rc):

@@ -9,7 +9,7 @@ from uuid import uuid4
 import attr
 from rhasspyhermes.audioserver import AudioPlayBytes
 from rhasspyhermes.base import Message
-from rhasspyhermes.tts import TtsSay, TtsSayFinished
+from rhasspyhermes.tts import TtsSay, TtsSayFinished, GetVoices, Voices, Voice
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -22,11 +22,13 @@ class TtsHermesMqtt:
         client,
         tts_command: str,
         play_command: typing.Optional[str] = None,
+        voices_command: typing.Optional[str] = None,
         siteId: str = "default",
     ):
         self.client = client
         self.tts_command = tts_command
         self.play_command = play_command
+        self.voices_command = voices_command
         self.siteId = siteId
 
     # -------------------------------------------------------------------------
@@ -69,12 +71,43 @@ class TtsHermesMqtt:
                     requestId=request_id,
                 )
 
+    def handle_get_voices(self, get_voices: GetVoices):
+        """Publish list of available voices"""
+        voices: typing.Dict[str, Voice] = {}
+        try:
+            _LOGGER.debug(self.voices_command)
+
+            lines = (
+                subprocess.check_output(self.voices_command, shell=True)
+                .decode()
+                .splitlines()
+            )
+
+            # Read a voice on each line.
+            # The line must start with a voice ID, optionally follow by
+            # whitespace and a description.
+            for line in lines:
+                line = line.strip()
+                if line:
+                    # ID description with whitespace
+                    parts = line.split(maxsplit=1)
+                    voice = Voice(voiceId=parts[0])
+                    if len(parts) > 1:
+                        voice.description = parts[1]
+
+                    voices[voice.voiceId] = voice
+        except Exception:
+            _LOGGER.exception("handle_get_voices")
+
+        # Publish response
+        self.publish(Voices(voices=voices, id=get_voices.id, siteId=get_voices.siteId))
+
     # -------------------------------------------------------------------------
 
     def on_connect(self, client, userdata, flags, rc):
         """Connected to MQTT broker."""
         try:
-            topics = [TtsSay.topic()]
+            topics = [TtsSay.topic(), GetVoices.topic()]
             for topic in topics:
                 self.client.subscribe(topic)
                 _LOGGER.debug("Subscribed to %s", topic)
@@ -88,12 +121,17 @@ class TtsHermesMqtt:
 
             if msg.topic == TtsSay.topic():
                 json_payload = json.loads(msg.payload or "{}")
-
                 if not self._check_siteId(json_payload):
                     return
 
-                say = TtsSay(**json_payload)
-                self.handle_say(say)
+                self.handle_say(TtsSay.from_dict(json_payload))
+            elif msg.topic == GetVoices.topic():
+                json_payload = json.loads(msg.payload or "{}")
+                if not self._check_siteId(json_payload):
+                    return
+
+                self.handle_get_voices(GetVoices.from_dict(json_payload))
+
         except Exception:
             _LOGGER.exception("on_message")
 
