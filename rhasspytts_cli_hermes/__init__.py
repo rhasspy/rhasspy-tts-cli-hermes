@@ -9,7 +9,7 @@ from uuid import uuid4
 import attr
 from rhasspyhermes.audioserver import AudioPlayBytes
 from rhasspyhermes.base import Message
-from rhasspyhermes.tts import TtsSay, TtsSayFinished, GetVoices, Voices, Voice
+from rhasspyhermes.tts import GetVoices, TtsSay, TtsSayFinished, Voice, Voices
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -75,6 +75,7 @@ class TtsHermesMqtt:
         """Publish list of available voices"""
         voices: typing.Dict[str, Voice] = {}
         try:
+            assert self.voices_command, "No voices command"
             _LOGGER.debug(self.voices_command)
 
             lines = (
