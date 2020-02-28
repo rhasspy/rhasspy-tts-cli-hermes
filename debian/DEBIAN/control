@@ -2,7 +2,7 @@ Package: rhasspy-tts-cli-hermes
 Version: ${version}
 Section: utils
 Priority: optional
-Depends: alsa-utils,espeak,flite
+Depends: alsa-utils,espeak,flite,curl
 Architecture: ${architecture}
 Maintainer: Michael Hansen
 Description: Hermes MQTT service for Rhasspy TTS using external program

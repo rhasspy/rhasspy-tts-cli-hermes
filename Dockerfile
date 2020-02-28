@@ -7,6 +7,9 @@ ARG FRIENDLY_ARCH
 COPY etc/qemu-arm-static /usr/bin/
 COPY etc/qemu-aarch64-static /usr/bin/
 
+RUN apk update && \
+    apk add espeak flite curl
+
 COPY requirements.txt /
 
 RUN grep '^rhasspy-' /requirements.txt | \
