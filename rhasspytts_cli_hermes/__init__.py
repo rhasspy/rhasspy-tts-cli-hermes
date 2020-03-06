@@ -23,13 +23,13 @@ class TtsHermesMqtt:
         tts_command: str,
         play_command: typing.Optional[str] = None,
         voices_command: typing.Optional[str] = None,
-        siteId: str = "default",
+        siteIds: typing.Optional[typing.List[str]] = None,
     ):
         self.client = client
         self.tts_command = tts_command
         self.play_command = play_command
         self.voices_command = voices_command
-        self.siteId = siteId
+        self.siteIds = siteIds or []
 
     # -------------------------------------------------------------------------
 
@@ -67,7 +67,7 @@ class TtsHermesMqtt:
                 request_id = say.id or str(uuid4())
                 self.publish(
                     AudioPlayBytes(wav_bytes=wav_bytes),
-                    siteId=self.siteId,
+                    siteId=say.siteId,
                     requestId=request_id,
                 )
 
@@ -157,4 +157,8 @@ class TtsHermesMqtt:
             _LOGGER.exception("on_message")
 
     def _check_siteId(self, json_payload: typing.Dict[str, typing.Any]) -> bool:
-        return json_payload.get("siteId", "default") == self.siteId
+        if self.siteIds:
+            return json_payload.get("siteId", "default") in self.siteIds
+
+        # All sites
+        return True

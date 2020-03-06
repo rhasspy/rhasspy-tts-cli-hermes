@@ -31,7 +31,9 @@ def main():
         "--port", type=int, default=1883, help="MQTT port (default: 1883)"
     )
     parser.add_argument(
-        "--siteId", default="default", help="Hermes siteId of this server"
+        "--siteId",
+        action="append",
+        help="Hermes siteId(s) to listen for (default: all)",
     )
     parser.add_argument(
         "--debug", action="store_true", help="Print DEBUG messages to the console"
@@ -53,7 +55,7 @@ def main():
             args.tts_command,
             play_command=args.play_command,
             voices_command=args.voices_command,
-            siteId=args.siteId,
+            siteIds=args.siteId,
         )
 
         def on_disconnect(client, userdata, flags, rc):
