@@ -6,7 +6,9 @@ import paho.mqtt.client as mqtt
 
 from . import TtsHermesMqtt
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = logging.getLogger("rhasspytts_cli_hermes")
+
+# -----------------------------------------------------------------------------
 
 
 def main():

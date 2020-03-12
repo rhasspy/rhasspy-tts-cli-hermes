@@ -11,7 +11,9 @@ from rhasspyhermes.audioserver import AudioPlayBytes
 from rhasspyhermes.base import Message
 from rhasspyhermes.tts import GetVoices, TtsSay, TtsSayFinished, Voice, Voices
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = logging.getLogger("rhasspytts_cli_hermes")
+
+# -----------------------------------------------------------------------------
 
 
 class TtsHermesMqtt:
