@@ -1,14 +1,14 @@
 """Hermes MQTT server for Rhasspy TTS using external program"""
-import json
+import asyncio
 import logging
 import shlex
 import subprocess
 import typing
 from uuid import uuid4
 
-import attr
 from rhasspyhermes.audioserver import AudioPlayBytes
 from rhasspyhermes.base import Message
+from rhasspyhermes.client import HermesClient, TopicArgs
 from rhasspyhermes.tts import GetVoices, TtsSay, TtsSayFinished, Voice, Voices
 
 _LOGGER = logging.getLogger("rhasspytts_cli_hermes")
@@ -16,7 +16,7 @@ _LOGGER = logging.getLogger("rhasspytts_cli_hermes")
 # -----------------------------------------------------------------------------
 
 
-class TtsHermesMqtt:
+class TtsHermesMqtt(HermesClient):
     """Hermes MQTT server for Rhasspy TTS using external program."""
 
     def __init__(
@@ -26,16 +26,26 @@ class TtsHermesMqtt:
         play_command: typing.Optional[str] = None,
         voices_command: typing.Optional[str] = None,
         siteIds: typing.Optional[typing.List[str]] = None,
+        loop=None,
     ):
-        self.client = client
+        super().__init__("rhasspytts_cli_hermes", client, siteIds=siteIds, loop=loop)
+
+        self.subscribe(TtsSay, GetVoices)
+
         self.tts_command = tts_command
         self.play_command = play_command
         self.voices_command = voices_command
-        self.siteIds = siteIds or []
+
+        # Event loop
+        self.loop = loop or asyncio.get_event_loop()
 
     # -------------------------------------------------------------------------
 
-    def handle_say(self, say: TtsSay):
+    async def handle_say(
+        self, say: TtsSay
+    ) -> typing.AsyncIterable[
+        typing.Union[TtsSayFinished, typing.Tuple[AudioPlayBytes, TopicArgs]]
+    ]:
         """Run TTS system and publish WAV data."""
         wav_bytes: typing.Optional[bytes] = None
 
@@ -51,7 +61,7 @@ class TtsHermesMqtt:
         except Exception:
             _LOGGER.exception("tts_command")
         finally:
-            self.publish(TtsSayFinished(id=say.id, sessionId=say.sessionId))
+            yield TtsSayFinished(id=say.id, sessionId=say.sessionId)
 
         if wav_bytes:
             # Play WAV
@@ -67,13 +77,14 @@ class TtsHermesMqtt:
             else:
                 # Publish playBytes
                 request_id = say.id or str(uuid4())
-                self.publish(
+                yield (
                     AudioPlayBytes(wav_bytes=wav_bytes),
-                    siteId=say.siteId,
-                    requestId=request_id,
+                    {"siteId": say.siteId, "requestId": request_id},
                 )
 
-    def handle_get_voices(self, get_voices: GetVoices):
+    async def handle_get_voices(
+        self, get_voices: GetVoices
+    ) -> typing.AsyncIterable[Voices]:
         """Publish list of available voices"""
         voices: typing.Dict[str, Voice] = {}
         try:
@@ -103,65 +114,21 @@ class TtsHermesMqtt:
             _LOGGER.exception("handle_get_voices")
 
         # Publish response
-        self.publish(Voices(voices=voices, id=get_voices.id, siteId=get_voices.siteId))
+        yield Voices(voices=voices, id=get_voices.id, siteId=get_voices.siteId)
 
     # -------------------------------------------------------------------------
 
-    def on_connect(self, client, userdata, flags, rc):
-        """Connected to MQTT broker."""
-        try:
-            topics = [TtsSay.topic(), GetVoices.topic()]
-            for topic in topics:
-                self.client.subscribe(topic)
-                _LOGGER.debug("Subscribed to %s", topic)
-        except Exception:
-            _LOGGER.exception("on_connect")
-
-    def on_message(self, client, userdata, msg):
+    async def on_message(
+        self,
+        message: Message,
+        siteId: typing.Optional[str] = None,
+        sessionId: typing.Optional[str] = None,
+        topic: typing.Optional[str] = None,
+    ):
         """Received message from MQTT broker."""
-        try:
-            _LOGGER.debug("Received %s byte(s) on %s", len(msg.payload), msg.topic)
-
-            if msg.topic == TtsSay.topic():
-                json_payload = json.loads(msg.payload or "{}")
-                if not self._check_siteId(json_payload):
-                    return
-
-                self.handle_say(TtsSay.from_dict(json_payload))
-            elif msg.topic == GetVoices.topic():
-                json_payload = json.loads(msg.payload or "{}")
-                if not self._check_siteId(json_payload):
-                    return
-
-                self.handle_get_voices(GetVoices.from_dict(json_payload))
-
-        except Exception:
-            _LOGGER.exception("on_message")
-            _LOGGER.error("%s %s", msg.topic, msg.payload)
-
-    def publish(self, message: Message, **topic_args):
-        """Publish a Hermes message to MQTT."""
-        try:
-            if isinstance(message, AudioPlayBytes):
-                _LOGGER.debug(
-                    "-> %s(%s byte(s))",
-                    message.__class__.__name__,
-                    len(message.wav_bytes),
-                )
-                payload = message.wav_bytes
-            else:
-                _LOGGER.debug("-> %s", message)
-                payload = json.dumps(attr.asdict(message)).encode()
-
-            topic = message.topic(**topic_args)
-            _LOGGER.debug("Publishing %s bytes(s) to %s", len(payload), topic)
-            self.client.publish(topic, payload)
-        except Exception:
-            _LOGGER.exception("on_message")
-
-    def _check_siteId(self, json_payload: typing.Dict[str, typing.Any]) -> bool:
-        if self.siteIds:
-            return json_payload.get("siteId", "default") in self.siteIds
-
-        # All sites
-        return True
+        if isinstance(message, TtsSay):
+            await self.publish_all(self.handle_say(message))
+        elif isinstance(message, GetVoices):
+            await self.publish_all(self.handle_get_voices(message))
+        else:
+            _LOGGER.warning("Unexpected message: %s", message)
