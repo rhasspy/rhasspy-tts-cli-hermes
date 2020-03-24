@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from rhasspyhermes.audioserver import AudioPlayBytes
 from rhasspyhermes.base import Message
-from rhasspyhermes.client import HermesClient, TopicArgs
+from rhasspyhermes.client import GeneratorType, HermesClient, TopicArgs
 from rhasspyhermes.tts import GetVoices, TtsSay, TtsSayFinished, Voice, Voices
 
 _LOGGER = logging.getLogger("rhasspytts_cli_hermes")
@@ -124,11 +124,13 @@ class TtsHermesMqtt(HermesClient):
         siteId: typing.Optional[str] = None,
         sessionId: typing.Optional[str] = None,
         topic: typing.Optional[str] = None,
-    ):
+    ) -> GeneratorType:
         """Received message from MQTT broker."""
         if isinstance(message, TtsSay):
-            await self.publish_all(self.handle_say(message))
+            async for say_result in self.handle_say(message):
+                yield say_result
         elif isinstance(message, GetVoices):
-            await self.publish_all(self.handle_get_voices(message))
+            async for voice_result in self.handle_get_voices(message):
+                yield voice_result
         else:
             _LOGGER.warning("Unexpected message: %s", message)
