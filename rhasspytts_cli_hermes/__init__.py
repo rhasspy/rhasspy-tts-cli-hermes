@@ -61,7 +61,7 @@ class TtsHermesMqtt(HermesClient):
         except Exception:
             _LOGGER.exception("tts_command")
         finally:
-            yield TtsSayFinished(id=say.id, sessionId=say.sessionId)
+            yield TtsSayFinished(id=say.id, siteId=say.siteId, sessionId=say.sessionId)
 
         if wav_bytes:
             # Play WAV
