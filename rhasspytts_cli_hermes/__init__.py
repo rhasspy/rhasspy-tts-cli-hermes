@@ -25,6 +25,7 @@ class TtsHermesMqtt(HermesClient):
         tts_command: str,
         play_command: typing.Optional[str] = None,
         voices_command: typing.Optional[str] = None,
+        language: str = "",
         siteIds: typing.Optional[typing.List[str]] = None,
         loop=None,
     ):
@@ -35,6 +36,7 @@ class TtsHermesMqtt(HermesClient):
         self.tts_command = tts_command
         self.play_command = play_command
         self.voices_command = voices_command
+        self.language = language
 
         # Event loop
         self.loop = loop or asyncio.get_event_loop()
@@ -50,7 +52,8 @@ class TtsHermesMqtt(HermesClient):
         wav_bytes: typing.Optional[bytes] = None
 
         try:
-            say_command = shlex.split(self.tts_command.format(lang=say.lang)) + [
+            language = say.lang or self.language
+            say_command = shlex.split(self.tts_command.format(lang=language)) + [
                 say.text
             ]
             _LOGGER.debug(say_command)

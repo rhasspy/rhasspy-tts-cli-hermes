@@ -28,6 +28,9 @@ def main():
     parser.add_argument(
         "--voices-command", help="Command to list voices (one per line)"
     )
+    parser.add_argument(
+        "--language", default="", help="Default language passed to command"
+    )
 
     hermes_cli.add_hermes_args(parser)
     args = parser.parse_args()
@@ -45,6 +48,7 @@ def main():
             args.tts_command,
             play_command=args.play_command,
             voices_command=args.voices_command,
+            language=args.language,
             siteIds=args.siteId,
             loop=loop,
         )
