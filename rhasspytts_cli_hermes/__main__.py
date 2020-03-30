@@ -38,31 +38,29 @@ def main():
     hermes_cli.setup_logging(args)
     _LOGGER.debug(args)
 
+    # Listen for messages
+    client = mqtt.Client()
+    hermes = TtsHermesMqtt(
+        client,
+        args.tts_command,
+        play_command=args.play_command,
+        voices_command=args.voices_command,
+        language=args.language,
+        siteIds=args.siteId,
+    )
+
+    _LOGGER.debug("Connecting to %s:%s", args.host, args.port)
+    hermes_cli.connect(client, args)
+    client.loop_start()
+
     try:
-        loop = asyncio.get_event_loop()
-
-        # Listen for messages
-        client = mqtt.Client()
-        hermes = TtsHermesMqtt(
-            client,
-            args.tts_command,
-            play_command=args.play_command,
-            voices_command=args.voices_command,
-            language=args.language,
-            siteIds=args.siteId,
-            loop=loop,
-        )
-
-        _LOGGER.debug("Connecting to %s:%s", args.host, args.port)
-        hermes_cli.connect(client, args)
-        client.loop_start()
-
         # Run event loop
-        hermes.loop.run_forever()
+        asyncio.run(hermes.handle_messages_async())
     except KeyboardInterrupt:
         pass
     finally:
         _LOGGER.debug("Shutting down")
+        client.loop_stop()
 
 
 # -----------------------------------------------------------------------------

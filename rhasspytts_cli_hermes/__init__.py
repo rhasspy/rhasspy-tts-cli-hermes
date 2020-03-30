@@ -1,5 +1,4 @@
 """Hermes MQTT server for Rhasspy TTS using external program"""
-import asyncio
 import logging
 import shlex
 import subprocess
@@ -27,9 +26,8 @@ class TtsHermesMqtt(HermesClient):
         voices_command: typing.Optional[str] = None,
         language: str = "",
         siteIds: typing.Optional[typing.List[str]] = None,
-        loop=None,
     ):
-        super().__init__("rhasspytts_cli_hermes", client, siteIds=siteIds, loop=loop)
+        super().__init__("rhasspytts_cli_hermes", client, siteIds=siteIds)
 
         self.subscribe(TtsSay, GetVoices)
 
@@ -37,9 +35,6 @@ class TtsHermesMqtt(HermesClient):
         self.play_command = play_command
         self.voices_command = voices_command
         self.language = language
-
-        # Event loop
-        self.loop = loop or asyncio.get_event_loop()
 
     # -------------------------------------------------------------------------
 
