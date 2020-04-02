@@ -41,7 +41,12 @@ class TtsHermesMqtt(HermesClient):
     async def handle_say(
         self, say: TtsSay
     ) -> typing.AsyncIterable[
-        typing.Union[TtsSayFinished, typing.Tuple[AudioPlayBytes, TopicArgs], TtsError]
+        typing.Union[
+            TtsSayFinished,
+            typing.Tuple[AudioPlayBytes, TopicArgs],
+            TtsError,
+            AudioPlayError,
+        ]
     ]:
         """Run TTS system and publish WAV data."""
         wav_bytes: typing.Optional[bytes] = None
@@ -73,7 +78,7 @@ class TtsHermesMqtt(HermesClient):
                     _LOGGER.debug(play_command)
 
                     subprocess.run(play_command, input=wav_bytes, check=True)
-                except Exception:
+                except Exception as e:
                     _LOGGER.exception("play_command")
                     yield AudioPlayError(
                         error=str(e),
