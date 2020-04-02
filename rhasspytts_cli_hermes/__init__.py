@@ -8,7 +8,7 @@ from uuid import uuid4
 from rhasspyhermes.audioserver import AudioPlayBytes
 from rhasspyhermes.base import Message
 from rhasspyhermes.client import GeneratorType, HermesClient, TopicArgs
-from rhasspyhermes.tts import GetVoices, TtsSay, TtsSayFinished, Voice, Voices
+from rhasspyhermes.tts import GetVoices, TtsError, TtsSay, TtsSayFinished, Voice, Voices
 
 _LOGGER = logging.getLogger("rhasspytts_cli_hermes")
 
@@ -41,7 +41,7 @@ class TtsHermesMqtt(HermesClient):
     async def handle_say(
         self, say: TtsSay
     ) -> typing.AsyncIterable[
-        typing.Union[TtsSayFinished, typing.Tuple[AudioPlayBytes, TopicArgs]]
+        typing.Union[TtsSayFinished, typing.Tuple[AudioPlayBytes, TopicArgs], TtsError]
     ]:
         """Run TTS system and publish WAV data."""
         wav_bytes: typing.Optional[bytes] = None
@@ -56,8 +56,11 @@ class TtsHermesMqtt(HermesClient):
             wav_bytes = subprocess.check_output(say_command)
             assert wav_bytes
             _LOGGER.debug("Got %s byte(s) of WAV data", len(wav_bytes))
-        except Exception:
+        except Exception as e:
             _LOGGER.exception("tts_command")
+            yield TtsError(
+                error=str(e), context=say.id, siteId=say.siteId, sessionId=say.sessionId
+            )
         finally:
             yield TtsSayFinished(id=say.id, siteId=say.siteId, sessionId=say.sessionId)
 
@@ -82,7 +85,7 @@ class TtsHermesMqtt(HermesClient):
 
     async def handle_get_voices(
         self, get_voices: GetVoices
-    ) -> typing.AsyncIterable[Voices]:
+    ) -> typing.AsyncIterable[typing.Union[Voices, TtsError]]:
         """Publish list of available voices"""
         voices: typing.Dict[str, Voice] = {}
         try:
@@ -108,8 +111,11 @@ class TtsHermesMqtt(HermesClient):
                         voice.description = parts[1]
 
                     voices[voice.voiceId] = voice
-        except Exception:
+        except Exception as e:
             _LOGGER.exception("handle_get_voices")
+            yield TtsError(
+                error=str(e), context=get_voices.id, siteId=get_voices.siteId
+            )
 
         # Publish response
         yield Voices(voices=voices, id=get_voices.id, siteId=get_voices.siteId)
