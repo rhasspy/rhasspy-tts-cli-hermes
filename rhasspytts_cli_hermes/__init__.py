@@ -5,7 +5,7 @@ import subprocess
 import typing
 from uuid import uuid4
 
-from rhasspyhermes.audioserver import AudioPlayBytes
+from rhasspyhermes.audioserver import AudioPlayBytes, AudioPlayError
 from rhasspyhermes.base import Message
 from rhasspyhermes.client import GeneratorType, HermesClient, TopicArgs
 from rhasspyhermes.tts import GetVoices, TtsError, TtsSay, TtsSayFinished, Voice, Voices
@@ -75,6 +75,12 @@ class TtsHermesMqtt(HermesClient):
                     subprocess.run(play_command, input=wav_bytes, check=True)
                 except Exception:
                     _LOGGER.exception("play_command")
+                    yield AudioPlayError(
+                        error=str(e),
+                        context=say.id,
+                        siteId=say.siteId,
+                        sessionId=say.sessionId,
+                    )
             else:
                 # Publish playBytes
                 request_id = say.id or str(uuid4())
