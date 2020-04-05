@@ -1,14 +1,17 @@
 """Hermes MQTT server for Rhasspy TTS using external program"""
+import asyncio
 import logging
 import shlex
 import subprocess
 import typing
 from uuid import uuid4
 
-from rhasspyhermes.audioserver import AudioPlayBytes, AudioPlayError
+from rhasspyhermes.audioserver import AudioPlayBytes, AudioPlayError, AudioPlayFinished
 from rhasspyhermes.base import Message
 from rhasspyhermes.client import GeneratorType, HermesClient, TopicArgs
 from rhasspyhermes.tts import GetVoices, TtsError, TtsSay, TtsSayFinished, Voice, Voices
+
+from .utils import get_wav_duration
 
 _LOGGER = logging.getLogger("rhasspytts_cli_hermes")
 
@@ -29,12 +32,14 @@ class TtsHermesMqtt(HermesClient):
     ):
         super().__init__("rhasspytts_cli_hermes", client, siteIds=siteIds)
 
-        self.subscribe(TtsSay, GetVoices)
+        self.subscribe(TtsSay, GetVoices, AudioPlayFinished)
 
         self.tts_command = tts_command
         self.play_command = play_command
         self.voices_command = voices_command
         self.language = language
+
+        self.play_finished_events: typing.Dict[str, asyncio.Event] = {}
 
     # -------------------------------------------------------------------------
 
@@ -59,7 +64,7 @@ class TtsHermesMqtt(HermesClient):
             _LOGGER.debug(say_command)
 
             wav_bytes = subprocess.check_output(say_command)
-            assert wav_bytes
+            assert wav_bytes, "No WAV data received"
             _LOGGER.debug("Got %s byte(s) of WAV data", len(wav_bytes))
         except Exception as e:
             _LOGGER.exception("tts_command")
@@ -70,6 +75,8 @@ class TtsHermesMqtt(HermesClient):
             yield TtsSayFinished(id=say.id, siteId=say.siteId, sessionId=say.sessionId)
 
         if wav_bytes:
+            finished_event = asyncio.Event()
+
             # Play WAV
             if self.play_command:
                 try:
@@ -78,6 +85,7 @@ class TtsHermesMqtt(HermesClient):
                     _LOGGER.debug(play_command)
 
                     subprocess.run(play_command, input=wav_bytes, check=True)
+                    finished_event.set()
                 except Exception as e:
                     _LOGGER.exception("play_command")
                     yield AudioPlayError(
@@ -89,10 +97,19 @@ class TtsHermesMqtt(HermesClient):
             else:
                 # Publish playBytes
                 request_id = say.id or str(uuid4())
+                self.play_finished_events[request_id] = finished_event
+
                 yield (
                     AudioPlayBytes(wav_bytes=wav_bytes),
                     {"siteId": say.siteId, "requestId": request_id},
                 )
+
+            try:
+                # Wait for audio to finished playing or timeout
+                wav_duration = get_wav_duration(wav_bytes)
+                await asyncio.wait_for(finished_event.wait(), timeout=wav_duration)
+            except asyncio.TimeoutError:
+                pass
 
     async def handle_get_voices(
         self, get_voices: GetVoices
@@ -147,5 +164,10 @@ class TtsHermesMqtt(HermesClient):
         elif isinstance(message, GetVoices):
             async for voice_result in self.handle_get_voices(message):
                 yield voice_result
+        elif isinstance(message, AudioPlayFinished):
+            # Signal audio play finished
+            finished_event = self.play_finished_events.pop(message.sessionId, None)
+            if finished_event:
+                finished_event.set()
         else:
             _LOGGER.warning("Unexpected message: %s", message)
