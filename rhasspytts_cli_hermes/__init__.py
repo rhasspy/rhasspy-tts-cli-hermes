@@ -66,50 +66,56 @@ class TtsHermesMqtt(HermesClient):
             wav_bytes = subprocess.check_output(say_command)
             assert wav_bytes, "No WAV data received"
             _LOGGER.debug("Got %s byte(s) of WAV data", len(wav_bytes))
+
+            if wav_bytes:
+                finished_event = asyncio.Event()
+
+                # Play WAV
+                if self.play_command:
+                    try:
+                        # Play locally
+                        play_command = shlex.split(
+                            self.play_command.format(lang=say.lang)
+                        )
+                        _LOGGER.debug(play_command)
+
+                        subprocess.run(play_command, input=wav_bytes, check=True)
+                        finished_event.set()
+                    except Exception as e:
+                        _LOGGER.exception("play_command")
+                        yield AudioPlayError(
+                            error=str(e),
+                            context=say.id,
+                            siteId=say.siteId,
+                            sessionId=say.sessionId,
+                        )
+                else:
+                    # Publish playBytes
+                    request_id = say.id or str(uuid4())
+                    self.play_finished_events[request_id] = finished_event
+
+                    yield (
+                        AudioPlayBytes(wav_bytes=wav_bytes),
+                        {"siteId": say.siteId, "requestId": request_id},
+                    )
+
+                try:
+                    # Wait for audio to finished playing or timeout
+                    wav_duration = get_wav_duration(wav_bytes)
+                    _LOGGER.debug(
+                        "Waiting for play finished (timeout=%s)", wav_duration
+                    )
+                    await asyncio.wait_for(finished_event.wait(), timeout=wav_duration)
+                except asyncio.TimeoutError:
+                    pass
+
         except Exception as e:
-            _LOGGER.exception("tts_command")
+            _LOGGER.exception("handle_say")
             yield TtsError(
                 error=str(e), context=say.id, siteId=say.siteId, sessionId=say.sessionId
             )
         finally:
             yield TtsSayFinished(id=say.id, siteId=say.siteId, sessionId=say.sessionId)
-
-        if wav_bytes:
-            finished_event = asyncio.Event()
-
-            # Play WAV
-            if self.play_command:
-                try:
-                    # Play locally
-                    play_command = shlex.split(self.play_command.format(lang=say.lang))
-                    _LOGGER.debug(play_command)
-
-                    subprocess.run(play_command, input=wav_bytes, check=True)
-                    finished_event.set()
-                except Exception as e:
-                    _LOGGER.exception("play_command")
-                    yield AudioPlayError(
-                        error=str(e),
-                        context=say.id,
-                        siteId=say.siteId,
-                        sessionId=say.sessionId,
-                    )
-            else:
-                # Publish playBytes
-                request_id = say.id or str(uuid4())
-                self.play_finished_events[request_id] = finished_event
-
-                yield (
-                    AudioPlayBytes(wav_bytes=wav_bytes),
-                    {"siteId": say.siteId, "requestId": request_id},
-                )
-
-            try:
-                # Wait for audio to finished playing or timeout
-                wav_duration = get_wav_duration(wav_bytes)
-                await asyncio.wait_for(finished_event.wait(), timeout=wav_duration)
-            except asyncio.TimeoutError:
-                pass
 
     async def handle_get_voices(
         self, get_voices: GetVoices
@@ -166,7 +172,7 @@ class TtsHermesMqtt(HermesClient):
                 yield voice_result
         elif isinstance(message, AudioPlayFinished):
             # Signal audio play finished
-            finished_event = self.play_finished_events.pop(message.sessionId, None)
+            finished_event = self.play_finished_events.pop(message.id, None)
             if finished_event:
                 finished_event.set()
         else:

@@ -8,6 +8,11 @@ def get_wav_duration(wav_bytes: bytes) -> float:
     with io.BytesIO(wav_bytes) as wav_buffer:
         wav_file: wave.Wave_read = wave.open(wav_buffer, "rb")
         with wav_file:
-            frames = wav_file.getnframes()
+            width = wav_file.getsampwidth()
             rate = wav_file.getframerate()
-            return frames / float(rate)
+
+            # getnframes is not reliable.
+            # espeak inserts crazy large numbers.
+            guess_frames = (len(wav_bytes) - 44) / width
+
+            return guess_frames / float(rate)
