@@ -46,7 +46,7 @@ def main():
         play_command=args.play_command,
         voices_command=args.voices_command,
         language=args.language,
-        siteIds=args.siteId,
+        site_ids=args.site_id,
     )
 
     _LOGGER.debug("Connecting to %s:%s", args.host, args.port)

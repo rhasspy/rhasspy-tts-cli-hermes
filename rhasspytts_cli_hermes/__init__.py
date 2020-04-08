@@ -28,9 +28,9 @@ class TtsHermesMqtt(HermesClient):
         play_command: typing.Optional[str] = None,
         voices_command: typing.Optional[str] = None,
         language: str = "",
-        siteIds: typing.Optional[typing.List[str]] = None,
+        site_ids: typing.Optional[typing.List[str]] = None,
     ):
-        super().__init__("rhasspytts_cli_hermes", client, siteIds=siteIds)
+        super().__init__("rhasspytts_cli_hermes", client, site_ids=site_ids)
 
         self.subscribe(TtsSay, GetVoices, AudioPlayFinished)
 
@@ -39,7 +39,7 @@ class TtsHermesMqtt(HermesClient):
         self.voices_command = voices_command
         self.language = language
 
-        self.play_finished_events: typing.Dict[str, asyncio.Event] = {}
+        self.play_finished_events: typing.Dict[typing.Optional[str], asyncio.Event] = {}
 
         # Seconds added to playFinished timeout
         self.finished_timeout_extra: float = 0.25
@@ -91,8 +91,8 @@ class TtsHermesMqtt(HermesClient):
                         yield AudioPlayError(
                             error=str(e),
                             context=say.id,
-                            siteId=say.siteId,
-                            sessionId=say.sessionId,
+                            site_id=say.site_id,
+                            session_id=say.session_id,
                         )
                 else:
                     # Publish playBytes
@@ -101,7 +101,7 @@ class TtsHermesMqtt(HermesClient):
 
                     yield (
                         AudioPlayBytes(wav_bytes=wav_bytes),
-                        {"siteId": say.siteId, "requestId": request_id},
+                        {"site_id": say.site_id, "request_id": request_id},
                     )
 
                 try:
@@ -117,10 +117,15 @@ class TtsHermesMqtt(HermesClient):
         except Exception as e:
             _LOGGER.exception("handle_say")
             yield TtsError(
-                error=str(e), context=say.id, siteId=say.siteId, sessionId=say.sessionId
+                error=str(e),
+                context=say.id,
+                site_id=say.site_id,
+                session_id=say.session_id,
             )
         finally:
-            yield TtsSayFinished(id=say.id, siteId=say.siteId, sessionId=say.sessionId)
+            yield TtsSayFinished(
+                id=say.id, site_id=say.site_id, session_id=say.session_id
+            )
 
     async def handle_get_voices(
         self, get_voices: GetVoices
@@ -145,27 +150,27 @@ class TtsHermesMqtt(HermesClient):
                 if line:
                     # ID description with whitespace
                     parts = line.split(maxsplit=1)
-                    voice = Voice(voiceId=parts[0])
+                    voice = Voice(voice_id=parts[0])
                     if len(parts) > 1:
                         voice.description = parts[1]
 
-                    voices[voice.voiceId] = voice
+                    voices[voice.voice_id] = voice
         except Exception as e:
             _LOGGER.exception("handle_get_voices")
             yield TtsError(
-                error=str(e), context=get_voices.id, siteId=get_voices.siteId
+                error=str(e), context=get_voices.id, site_id=get_voices.site_id
             )
 
         # Publish response
-        yield Voices(voices=voices, id=get_voices.id, siteId=get_voices.siteId)
+        yield Voices(voices=voices, id=get_voices.id, site_id=get_voices.site_id)
 
     # -------------------------------------------------------------------------
 
     async def on_message(
         self,
         message: Message,
-        siteId: typing.Optional[str] = None,
-        sessionId: typing.Optional[str] = None,
+        site_id: typing.Optional[str] = None,
+        session_id: typing.Optional[str] = None,
         topic: typing.Optional[str] = None,
     ) -> GeneratorType:
         """Received message from MQTT broker."""
