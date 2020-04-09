@@ -131,7 +131,7 @@ class TtsHermesMqtt(HermesClient):
         self, get_voices: GetVoices
     ) -> typing.AsyncIterable[typing.Union[Voices, TtsError]]:
         """Publish list of available voices"""
-        voices: typing.Dict[str, Voice] = {}
+        voices: typing.List[Voice] = []
         try:
             assert self.voices_command, "No voices command"
             _LOGGER.debug(self.voices_command)
@@ -154,7 +154,7 @@ class TtsHermesMqtt(HermesClient):
                     if len(parts) > 1:
                         voice.description = parts[1]
 
-                    voices[voice.voice_id] = voice
+                    voices.append(voice)
         except Exception as e:
             _LOGGER.exception("handle_get_voices")
             yield TtsError(
