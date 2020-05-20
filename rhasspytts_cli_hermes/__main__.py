@@ -31,6 +31,16 @@ def main():
     parser.add_argument(
         "--language", default="", help="Default language passed to command"
     )
+    parser.add_argument(
+        "--temporary-wav",
+        action="store_true",
+        help="Pass path to temporary WAV file to TTS command",
+    )
+    parser.add_argument(
+        "--text-on-stdin",
+        action="store_true",
+        help="Pass input text to TTS command's stdin instead of as arguments",
+    )
 
     hermes_cli.add_hermes_args(parser)
     args = parser.parse_args()
@@ -45,6 +55,8 @@ def main():
         args.tts_command,
         play_command=args.play_command,
         voices_command=args.voices_command,
+        use_temp_wav=args.temporary_wav,
+        text_on_stdin=args.text_on_stdin,
         language=args.language,
         site_ids=args.site_id,
     )

@@ -1,8 +1,10 @@
 """Hermes MQTT server for Rhasspy TTS using external program"""
 import asyncio
 import logging
+import os
 import shlex
 import subprocess
+import tempfile
 import typing
 from uuid import uuid4
 
@@ -28,6 +30,8 @@ class TtsHermesMqtt(HermesClient):
         play_command: typing.Optional[str] = None,
         voices_command: typing.Optional[str] = None,
         language: str = "",
+        use_temp_wav: bool = False,
+        text_on_stdin: bool = False,
         site_ids: typing.Optional[typing.List[str]] = None,
     ):
         super().__init__("rhasspytts_cli_hermes", client, site_ids=site_ids)
@@ -38,6 +42,12 @@ class TtsHermesMqtt(HermesClient):
         self.play_command = play_command
         self.voices_command = voices_command
         self.language = language
+
+        # If True, a temporary file is used for TTS WAV audio
+        self.use_temp_wav = use_temp_wav
+
+        # If True, TTS text is provided on stdin instead of as arguments
+        self.text_on_stdin = text_on_stdin
 
         self.play_finished_events: typing.Dict[typing.Optional[str], asyncio.Event] = {}
 
@@ -58,15 +68,55 @@ class TtsHermesMqtt(HermesClient):
     ]:
         """Run TTS system and publish WAV data."""
         wav_bytes: typing.Optional[bytes] = None
+        temp_wav_path: typing.Optional[str] = None
 
         try:
             language = say.lang or self.language
-            say_command = shlex.split(self.tts_command.format(lang=language)) + [
-                say.text
-            ]
+            format_args = {"lang": language}
+
+            if self.use_temp_wav:
+                # WAV audio will be stored in a temporary file
+                temp_wav_path = tempfile.NamedTemporaryFile(
+                    suffix=".wav", delete=False
+                ).name
+
+                # Path to WAV file
+                format_args["file"] = temp_wav_path
+
+            tts_command_str = self.tts_command.format(**format_args)
+            say_command = shlex.split(tts_command_str)
+
+            if not self.text_on_stdin:
+                # Text as command-line arguments
+                say_command += [shlex.quote(say.text)]
+
             _LOGGER.debug(say_command)
 
-            wav_bytes = subprocess.check_output(say_command)
+            # WAV audio on stdout, text as command-line argument
+            proc_stdin: typing.Optional[int] = None
+            proc_stdout: typing.Optional[int] = subprocess.PIPE
+            proc_input: typing.Optional[bytes] = None
+
+            if self.use_temp_wav:
+                # WAV audio from file
+                proc_stdout = None
+
+            if self.text_on_stdin:
+                # Text from standard in
+                proc_stdin = subprocess.PIPE
+                proc_input = say.text.encode()
+
+            # Run TTS process
+            proc = subprocess.Popen(say_command, stdin=proc_stdin, stdout=proc_stdout)
+            wav_bytes, _ = proc.communicate(input=proc_input)
+            proc.wait()
+
+            assert proc.returncode == 0, f"Non-zero exit code: {proc.returncode}"
+
+            if self.use_temp_wav and temp_wav_path:
+                with open(temp_wav_path, "rb") as wav_file:
+                    wav_bytes = wav_file.read()
+
             assert wav_bytes, "No WAV data received"
             _LOGGER.debug("Got %s byte(s) of WAV data", len(wav_bytes))
 
@@ -126,6 +176,12 @@ class TtsHermesMqtt(HermesClient):
             yield TtsSayFinished(
                 id=say.id, site_id=say.site_id, session_id=say.session_id
             )
+
+            if temp_wav_path:
+                try:
+                    os.unlink(temp_wav_path)
+                except Exception:
+                    pass
 
     async def handle_get_voices(
         self, get_voices: GetVoices
