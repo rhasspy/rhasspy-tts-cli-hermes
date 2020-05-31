@@ -88,7 +88,7 @@ class TtsHermesMqtt(HermesClient):
 
             if not self.text_on_stdin:
                 # Text as command-line arguments
-                say_command += [shlex.quote(say.text)]
+                say_command += [say.text]
 
             _LOGGER.debug(say_command)
 
