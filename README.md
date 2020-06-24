@@ -16,58 +16,44 @@ Implements `hermes/tts` functionality from [Hermes protocol](https://docs.snips.
 
 Use `--play-command aplay` to play speech locally instead of using `hermes/audioServer<siteId>/playBytes`.
 
-## Running With Docker
+## Requirements
+
+* Python 3.7
+
+## Installation
 
 ```bash
-docker run -it rhasspy/rhasspy-tts-cli-hermes:<VERSION> <ARGS>
+$ git clone https://github.com/rhasspy/rhasspy-tts-cli-hermes
+$ cd rhasspy-tts-cli-hermes
+$ ./configure
+$ make
+$ make install
 ```
 
-## Building From Source
+## Running
 
-Clone the repository and create the virtual environment:
+Run script:
 
 ```bash
-git clone https://github.com/rhasspy/rhasspy-tts-cli-hermes.git
-cd rhasspy-tts-cli-hermes
-make venv
+bin/rhasspy-tts-cli-hermes <ARGS>
 ```
-
-Run the `bin/rhasspy-tts-cli-hermes` script to access the command-line interface:
-
-```bash
-bin/rhasspy-tts-cli-hermes --help
-```
-
-## Building the Debian Package
-
-Follow the instructions to build from source, then run:
-
-```bash
-source .venv/bin/activate
-make debian
-```
-
-If successful, you'll find a `.deb` file in the `dist` directory that can be installed with `apt`.
-
-## Building the Docker Image
-
-Follow the instructions to build from source, then run:
-
-```bash
-source .venv/bin/activate
-make docker
-```
-
-This will create a Docker image tagged `rhasspy/rhasspy-tts-cli-hermes:<VERSION>` where `VERSION` comes from the file of the same name in the source root directory.
-
-NOTE: If you add things to the Docker image, make sure to whitelist them in `.dockerignore`.
 
 ## Command-Line Options
 
 ```
 usage: rhasspy-tts-cli-hermes [-h] --tts-command TTS_COMMAND
-                              [--play-command PLAY_COMMAND] [--host HOST]
-                              [--port PORT] [--siteId SITEID] [--debug]
+                              [--play-command PLAY_COMMAND]
+                              [--voices-command VOICES_COMMAND]
+                              [--language LANGUAGE] [--temporary-wav]
+                              [--text-on-stdin] [--host HOST] [--port PORT]
+                              [--username USERNAME] [--password PASSWORD]
+                              [--tls] [--tls-ca-certs TLS_CA_CERTS]
+                              [--tls-certfile TLS_CERTFILE]
+                              [--tls-keyfile TLS_KEYFILE]
+                              [--tls-cert-reqs {CERT_REQUIRED,CERT_OPTIONAL,CERT_NONE}]
+                              [--tls-version TLS_VERSION]
+                              [--tls-ciphers TLS_CIPHERS] [--site-id SITE_ID]
+                              [--debug] [--log-format LOG_FORMAT]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -77,8 +63,32 @@ optional arguments:
   --play-command PLAY_COMMAND
                         Command to play WAV data from stdin (default: publish
                         playBytes)
+  --voices-command VOICES_COMMAND
+                        Command to list voices (one per line)
+  --language LANGUAGE   Default language passed to command
+  --temporary-wav       Pass path to temporary WAV file to TTS command
+  --text-on-stdin       Pass input text to TTS command's stdin instead of as
+                        arguments
   --host HOST           MQTT host (default: localhost)
   --port PORT           MQTT port (default: 1883)
-  --siteId SITEID       Hermes siteId of this server
+  --username USERNAME   MQTT username
+  --password PASSWORD   MQTT password
+  --tls                 Enable MQTT TLS
+  --tls-ca-certs TLS_CA_CERTS
+                        MQTT TLS Certificate Authority certificate files
+  --tls-certfile TLS_CERTFILE
+                        MQTT TLS certificate file (PEM)
+  --tls-keyfile TLS_KEYFILE
+                        MQTT TLS key file (PEM)
+  --tls-cert-reqs {CERT_REQUIRED,CERT_OPTIONAL,CERT_NONE}
+                        MQTT TLS certificate requirements (default:
+                        CERT_REQUIRED)
+  --tls-version TLS_VERSION
+                        MQTT TLS version (default: highest)
+  --tls-ciphers TLS_CIPHERS
+                        MQTT TLS ciphers to use
+  --site-id SITE_ID     Hermes site id(s) to listen for (default: all)
   --debug               Print DEBUG messages to the console
+  --log-format LOG_FORMAT
+                        Python logger format
 ```
