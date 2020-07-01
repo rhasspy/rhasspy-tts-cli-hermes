@@ -7,4 +7,11 @@ dist/
 *.egg-info/
 pyinstaller/
 download/
-etc/qemu-*
+
+/autom4te.cache/
+/Makefile
+/rhasspy-tts-cli-hermes
+/configure
+/config.status
+
+*.log

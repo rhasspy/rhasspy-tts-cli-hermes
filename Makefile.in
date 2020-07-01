@@ -1,0 +1,183 @@
+# Makefile.in
+#
+# Copyright © 2012, 2013 Brandon Invergo <brandon@invergo.net>
+#
+# Copying and distribution of this file, with or without modification,
+# are permitted in any medium without royalty provided the copyright
+# notice and this notice are preserved.  This file is offered as-is,
+# without any warranty.
+
+# List whatever files you want to include in your source distribution here.
+# You can include whole directories but note that *everything* under that
+# directory will be included
+DISTFILES = PKG-INFO Makefile.in configure install-sh rhasspy-nlu-hermes
+
+DESTDIR =
+PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
+PACKAGE_NAME = @PACKAGE_NAME@
+PACKAGE_STRING = @PACKAGE_STRING@
+PACKAGE_TARNAME = @PACKAGE_TARNAME@
+PACKAGE_DISTNAME = ${PACKAGE_NAME}-${PACKAGE_VERSION}
+PACKAGE_URL = @PACKAGE_URL@
+PACKAGE_VERSION = @PACKAGE_VERSION@
+PATH_SEPARATOR = @PATH_SEPARATOR@
+PYTHON = @PYTHON@
+VIRTUALENV = @VIRTUALENV@
+SHELL = @SHELL@
+MKDIR_P = @MKDIR_P@
+INSTALL = @INSTALL@
+INSTALL_PROGRAM = @INSTALL_PROGRAM@
+INSTALL_DATA = @INSTALL_DATA@
+INSTALL_SCRIPT = @INSTALL_SCRIPT@
+exec_prefix = @exec_prefix@
+includedir = @includedir@
+infodir = @infodir@
+prefix = @prefix@
+srcdir = @abs_srcdir@
+datadir = @datadir@
+datarootdir = @datarootdir@
+pkgdatadir = $(datadir)/@PACKAGE_NAME@
+pkgincludedir = $(includedir)/@PACKAGE_NAME@
+
+# -----------------------------------------------------------------------------
+# Dependencies
+# -----------------------------------------------------------------------------
+
+IN_PLACE = @IN_PLACE@
+
+BUILD_DIR ?= $(srcdir)/build
+DOWNLOAD_DIR ?= $(srcdir)/download
+DO_DOWNLOAD ?= curl -sSfL -o
+
+DOCKER_ARCH = @DOCKER_ARCH@
+
+ENABLE_NANOTTS = @ENABLE_NANOTTS@
+NANOTTS_FROM = @NANOTTS_FROM@
+NANOTTS_PRE_FILE = $(DOWNLOAD_DIR)/nanotts-20200520_$(DOCKER_ARCH).tar.gz
+NANOTTS_SRC_FILE = $(DOWNLOAD_DIR)/nanotts-20200520.tar.gz
+
+# -----------------------------------------------------------------------------
+
+VENV_DIR = $(DESTDIR)$(prefix)
+VENV_PYTHON = $(VENV_DIR)/bin/python
+VIRTUALENV_FLAGS ?= --clear
+
+ifeq ($(VIRTUALENV),yes)
+  INSTALL_PYTHON=$(VENV_PYTHON)
+else # VIRTUALENV == yes
+  INSTALL_PYTHON=$(PYTHON)
+endif # VIRTUALENV == yes
+
+.PHONY: all install uninstall distclean clean dist check installdirs
+
+all: download-init build-init nanotts
+
+.PHONY: install-init install-dependencies install-service
+install: installdirs \
+         install-init \
+         install-dependencies \
+         install-service
+
+install-init:
+ifeq ($(VIRTUALENV),yes)
+	"$(PYTHON)" -m venv $(VIRTUALENV_FLAGS) "$(VENV_DIR)" || "$(PYTHON)" -m venv "$(VENV_DIR)"
+	"$(VENV_PYTHON)" -m pip install $(PIP_INSTALL_ARGS) --upgrade pip
+	"$(VENV_PYTHON)" -m pip install $(PIP_INSTALL_ARGS) wheel || true
+	"$(VENV_PYTHON)" -m pip install $(PIP_INSTALL_ARGS) setuptools
+endif # VIRTUALENV == yes
+
+install-dependencies: install-nanotts
+
+install-service:
+ifeq ($(IN_PLACE),yes)
+	"$(INSTALL_PYTHON)" -m pip install $(PIP_INSTALL_ARGS) -r "$(srcdir)/requirements.txt"
+	"$(INSTALL_PYTHON)" -m pip install $(PIP_INSTALL_ARGS) -r "$(srcdir)/requirements_dev.txt" || true
+else # IN_PLACE == yes
+	"$(INSTALL_PYTHON)" -m pip install $(PIP_INSTALL_ARGS) "$(srcdir)"
+endif # IN_PLACE == yes
+	chmod +x "$(srcdir)/rhasspy-tts-cli-hermes"
+
+# -----------------------------------------------------------------------------
+
+.PHONY: download-init
+download-init:
+	$(MKDIR_P) "$(DOWNLOAD_DIR)"
+
+.PHONY: build-init
+build-init:
+	$(MKDIR_P) "$(BUILD_DIR)"
+
+# -----------------------------------------------------------------------------
+# nanoTTS: text to speech
+# https://github.com/gmn/nanotts
+# -----------------------------------------------------------------------------
+
+.PHONY: nanotts
+ifeq ($(ENABLE_NANOTTS),yes)
+nanotts: $(NANOTTS_PRE_FILE)
+
+install-nanotts: $(NANOTTS_PRE_FILE)
+	"$(srcdir)/scripts/install/install-nanotts.sh" "$(NANOTTS_PRE_FILE)" "$(DESTDIR)$(prefix)"
+
+  ifeq ($(NANOTTS_FROM),prebuilt)
+$(NANOTTS_PRE_FILE):
+	$(DO_DOWNLOAD) "$(NANOTTS_PRE_FILE)" "https://github.com/synesthesiam/prebuilt-apps/releases/download/v1.0/nanotts-20200520_$(DOCKER_ARCH).tar.gz"
+  else # NANOTTS_FROM
+$(NANOTTS_PRE_FILE): $(NANOTTS_SRC_FILE)
+	"$(srcdir)/scripts/build/build-nanotts.sh" "$(NANOTTS_SRC_FILE)" "$(BUILD_DIR)" "$(NANOTTS_PRE_FILE)"
+  endif # NANOTTS_FROM
+else # ENABLE_NANOTTS
+nanotts:
+
+install-nanotts:
+endif # ENABLE_NANOTTS
+
+$(NANOTTS_SRC_FILE):
+	$(DO_DOWNLOAD) "$(NANOTTS_SRC_FILE)" 'https://github.com/synesthesiam/prebuilt-apps/raw/master/download/nanotts-20200520.tar.gz'
+
+# -----------------------------------------------------------------------------
+
+uninstall:
+ifeq ($(VIRTUALENV),yes)
+	rm -rvf "$(VENV_DIR)"
+endif
+
+
+# Delete downloaded binaries and build artifacts
+clean:
+	"$(PYTHON)" setup.py clean
+	rm -rvf "$(BUILD_DIR)"
+
+
+# Clean up the output of configure
+distclean:
+	rm -v "$(srcdir)/config.log"
+	rm -v "$(srcdir)/config.status"
+	rm -rvf "$(srcdir)/autom4te.cache"
+	rm -v "$(srcdir)/Makefile"
+
+# You can either use the setup.py sdist command or you can roll your own here
+dist:
+	"$(PYTHON)" setup.py sdist
+
+# setup.py might complain if a directory doesn't exist so just in case, make the directory
+# here
+installdirs:
+	$(MKDIR_P) "$(DESTDIR)$(prefix)"
+
+# -----------------------------------------------------------------------------
+
+.PHONY: check reformat test
+
+check:
+	scripts/check-code.sh
+
+reformat:
+	scripts/format-code.sh
+
+test:
+	scripts/run-tests.sh
+
+deploy:
+	docker login --username rhasspy --password "$$DOCKER_PASSWORD"
+	scripts/build-docker.sh

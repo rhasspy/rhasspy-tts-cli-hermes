@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+prefix="@prefix@"
+virtualenv="@VIRTUALENV@"
+
+if [[ "${virtualenv}" = 'yes' ]]; then
+    echo "Using virtual environment at ${prefix}" >&2
+
+    # Use virtual environment
+    source "${prefix}/bin/activate"
+fi
+
+export LD_LIBRARY_PATH="${prefix}/lib:${LD_LIBRARY_PATH}"
+export PATH="${prefix}/bin:${PATH}"
+
+rhasspy-tts-cli-hermes "$@"
