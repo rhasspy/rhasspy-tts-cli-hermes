@@ -36,7 +36,7 @@ ENV LANG C.UTF-8
 RUN apt-get update && \
     apt-get install --no-install-recommends --yes \
         python3 python3-setuptools python3-pip python3-venv \
-        make curl ca-certificates
+        build-essential curl ca-certificates
 
 FROM build-ubuntu as build-amd64
 
@@ -65,16 +65,32 @@ ARG TARGETVARIANT
 FROM build-$TARGETARCH$TARGETVARIANT as build
 
 ENV APP_DIR=/usr/lib/rhasspy-tts-cli-hermes
+ENV BUILD_DIR=/build
 
-COPY requirements.txt Makefile ${APP_DIR}/
-COPY scripts/ ${APP_DIR}/scripts/
+# Directory of prebuilt tools
+COPY download/ ${BUILD_DIR}/download/
+
+COPY requirements.txt ${BUILD_DIR}/
+
+# Autoconf
+COPY m4/ ${BUILD_DIR}/m4/
+COPY configure config.sub config.guess \
+     install-sh missing aclocal.m4 \
+     Makefile.in rhasspy-tts-cli-hermes.in \
+     ${BUILD_DIR}/
+
+RUN cd ${BUILD_DIR} && \
+    ./configure --enable-in-place --prefix=${APP_DIR}/.venv
+
+COPY scripts/ ${BUILD_DIR}/scripts/
 
 # IFDEF PYPI
 #! ENV PIP_INDEX_URL=http://${PYPI}/simple/
 #! ENV PIP_TRUSTED_HOST=${PYPI_HOST}
 # ENDIF
 
-RUN cd ${APP_DIR} && \
+RUN cd ${BUILD_DIR} && \
+    make && \
     make install
 
 # Strip binaries and shared libraries
