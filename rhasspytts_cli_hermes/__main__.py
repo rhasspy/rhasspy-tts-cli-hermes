@@ -4,6 +4,7 @@ import asyncio
 import logging
 
 import paho.mqtt.client as mqtt
+
 import rhasspyhermes.cli as hermes_cli
 
 from . import TtsHermesMqtt
@@ -41,6 +42,9 @@ def main():
         action="store_true",
         help="Pass input text to TTS command's stdin instead of as arguments",
     )
+    parser.add_argument(
+        "--volume", type=float, help="Volume scale for output audio (0-1, default: 1)"
+    )
 
     hermes_cli.add_hermes_args(parser)
     args = parser.parse_args()
@@ -58,6 +62,7 @@ def main():
         use_temp_wav=args.temporary_wav,
         text_on_stdin=args.text_on_stdin,
         language=args.language,
+        volume=args.volume,
         site_ids=args.site_id,
     )
 
