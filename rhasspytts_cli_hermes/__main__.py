@@ -45,6 +45,11 @@ def main():
     parser.add_argument(
         "--volume", type=float, help="Volume scale for output audio (0-1, default: 1)"
     )
+    parser.add_argument(
+        "--use-jinja2",
+        action="store_true",
+        help="Use Jinja2 to format the command string instead of str.format",
+    )
 
     hermes_cli.add_hermes_args(parser)
     args = parser.parse_args()
@@ -63,6 +68,7 @@ def main():
         text_on_stdin=args.text_on_stdin,
         language=args.language,
         volume=args.volume,
+        use_jinja2=args.use_jinja2,
         site_ids=args.site_id,
     )
 

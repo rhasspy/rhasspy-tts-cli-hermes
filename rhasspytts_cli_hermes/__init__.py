@@ -36,6 +36,7 @@ class TtsHermesMqtt(HermesClient):
         use_temp_wav: bool = False,
         text_on_stdin: bool = False,
         volume: typing.Optional[float] = None,
+        use_jinja2: bool = False,
         site_ids: typing.Optional[typing.List[str]] = None,
     ):
         super().__init__("rhasspytts_cli_hermes", client, site_ids=site_ids)
@@ -48,6 +49,8 @@ class TtsHermesMqtt(HermesClient):
         self.language = language
 
         self.volume = volume
+        self.use_jinja2 = use_jinja2
+        self.jinja2_template: typing.Optional[typing.Any] = None
 
         # If True, a temporary file is used for TTS WAV audio
         self.use_temp_wav = use_temp_wav
@@ -89,7 +92,18 @@ class TtsHermesMqtt(HermesClient):
                 # Path to WAV file
                 format_args["file"] = temp_wav_path
 
-            tts_command_str = self.tts_command.format(**format_args)
+            if self.use_jinja2:
+                # Interpret TTS command as a Jinja2 template
+                if not self.jinja2_template:
+                    from jinja2 import Environment
+
+                    self.jinja2_template = Environment().from_string(self.tts_command)
+
+                tts_command_str = self.jinja2_template.render(**format_args)
+            else:
+                # Interpret TTS command as a formatted string
+                tts_command_str = self.tts_command.format(**format_args)
+
             say_command = shlex.split(tts_command_str)
 
             if not self.text_on_stdin:
