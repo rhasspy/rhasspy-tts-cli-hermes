@@ -4,7 +4,6 @@ import asyncio
 import logging
 
 import paho.mqtt.client as mqtt
-
 import rhasspyhermes.cli as hermes_cli
 
 from . import TtsHermesMqtt
